@@ -19,7 +19,7 @@ func main(){
 `)
 	_,err := fmt.Scan(&msgtype)
 	if err != nil {
-		fmt.Println("Some erro occured", err)
+		fmt.Println("Some error occured", err)
 	}
 
 	switch msgtype {
@@ -36,7 +36,10 @@ func main(){
 	case 6:
 		fmt.Println("chore selected!")
 	default:
-		fmt.Println("Choose between 1-6")
+		fmt.Println("Choose a number between 1-6!")
+		fmt.Println("Closing...")
+		return
+
 	}
 
 	_,err2 := fmt.Scan(&msg)
