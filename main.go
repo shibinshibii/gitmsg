@@ -2,52 +2,129 @@ package main
 
 import (
 	"fmt"
+	"time"
+
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
 )
 
-func main(){
-	var msgtype int
-	var msg string
+type model struct {
+	spinner   spinner.Model
+	done      bool
+	files     []string
+	msgdone   bool
+	commitmsg string
+}
 
-	fmt.Print(`Choose a type:
+type doneMsg struct{}
 
-1. feat
-2. fix
-3. refactor
-4. docs
-5. test
-6. chore
-`)
-	_,err := fmt.Scan(&msgtype)
-	if err != nil {
-		fmt.Println("Some error occured", err)
+type fileFoundMsg struct {
+	files []string
+}
+
+type commitmsg struct{}
+
+func finishLoading() tea.Cmd {
+	return tea.Tick(3*time.Second, func(t time.Time) tea.Msg {
+		return doneMsg{}
+	})
+}
+
+func generateCommitMessage() tea.Cmd {
+	return tea.Tick(8*time.Second, func(t time.Time) tea.Msg {
+		return commitmsg{}
+	})
+}
+
+func findFiles() tea.Cmd {
+	return func() tea.Msg {
+		return fileFoundMsg{
+			files: []string{
+				"main.go",
+				"README.md",
+				"go.mod",
+				"internal/git.go",
+				"cmd/root.go",
+			},
+		}
+	}
+}
+
+func initialModel() model {
+	s := spinner.New()
+	s.Spinner = spinner.Line
+	return model{
+		spinner: s,
+	}
+}
+func (m model) Init() tea.Cmd {
+	return tea.Batch(
+		m.spinner.Tick,
+		finishLoading(),
+		findFiles(),
+		generateCommitMessage(),
+	)
+
+}
+
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		if msg.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
+	case spinner.TickMsg:
+		var cmd tea.Cmd
+		m.spinner, cmd = m.spinner.Update(msg)
+		return m, cmd
+
+	case doneMsg:
+		m.done = true
+		return m, nil
+
+	case fileFoundMsg:
+		m.files = msg.files
+		return m, nil
+
+	case commitmsg:
+		m.msgdone = true
+		return m, nil
 	}
 
-	switch msgtype {
-	case 1:
-		fmt.Println("feat selected!")
-	case 2:
-		fmt.Println("fix selected!")
-	case 3:
-		fmt.Println("refactor selected!")
-	case 4:
-		fmt.Println("docs selected!")
-	case 5:
-		fmt.Println("test selected!")
-	case 6:
-		fmt.Println("chore selected!")
-	default:
-		fmt.Println("Choose a number between 1-6!")
-		fmt.Println("Closing...")
-		return
+	return m, nil
+}
 
+func (m model) View() tea.View {
+	var content string
+
+	if m.msgdone {
+		content += "✓ Analyzed git repository\n\n"
+		for _, file := range m.files {
+			content += "  " + file + "\n"
+
+		}
+		content += "\n✓ Found 5 files\n\n"
+		content += "Done!"
+
+	} else if m.done {
+		content += "✓ Analyzed git repository\n\n"
+		for _, file := range m.files {
+			content += "  " + file + "\n"
+
+		}
+		content += "\n✓ Found 5 files\n\n"
+	} else {
+		content += fmt.Sprintf(
+			"%s Analyzing git repository...\n",
+			m.spinner.View(),
+		)
 	}
+	return tea.NewView(content)
+}
 
-	_,err2 := fmt.Scan(&msg)
-	if err2!= nil {
-		fmt.Println("error occured", err2)
+func main() {
+	p := tea.NewProgram(initialModel())
+	if _, err := p.Run(); err != nil {
+		fmt.Println("Error:", err)
 	}
-
-	fmt.Println("Here is your git message")
-
-	fmt.Println(msgtype,":",msg)
 }
